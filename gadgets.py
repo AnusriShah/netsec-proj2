@@ -145,8 +145,9 @@ def add_eax_to_edx(self):
     tempOutput += "0x0012e414" # push random instead of pushing ebx; push 0x1185f89
     tempOutput += "0x00121c91" # add edx, eax
     return tempOutput
-def jump(self, output):
+def jump(self):
     # mov eax into temp register (edi)
+    output = ""
     output += "0x0002e745"
     output += "0x00019173"
     # sub eax, ecx
@@ -193,16 +194,22 @@ def helper(self, helperOutput):
             # write to mem_location
             # compare EAX to every input symbol
             # need another register to hold state
-            output += "0x0012a410" # TODO: trash other instructions in this cmp eax, ecx command
+
+            # 0x00115ff6 : cmp ecx, eax ; sbb eax, eax ; pop ebx ; pop esi ; ret
+            helperOutput += push_register("esi")
+            helperOutput += "0x0012e414" # push random instead of pushing ebx; push 0x1185f89
+            helperOutput += "0x00115ff6" # cmp ecx, eax
+            helperOutput += self.read_head() # put head value at edx back into eax
+            helperOutput += self.jump()
             # JUMP: JNE, push output byte (state, symbol, direction)
             # check the output byte - see if state is accept or reject
             # parse output byte
             state = ''
             if(state == 'r')
-                print("Output Payload: ", output)
+                print("Output Payload: ", helperOutput)
                 exit(1) # put lib c instruction to exit
             if(state == 'a')
-                print("Output Payload: ", output)
+                print("Output Payload: ", helperOutput)
                 exit(0) # put lib c instruction to exit
             # if reject, exit with 1
             # if accept, exit with 0
