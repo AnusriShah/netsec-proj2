@@ -14,14 +14,15 @@ def initialize_head_state(self):
     return tempOutput
 # head is edx, eax is the value, moving eax into edx
 def write_head(self, num):
+    tempOutput += num
     tempOutput += self.pop_register("eax")
-    tempOutput = num
     tempOutput += "0x0007672a" # mov dword ptr [edx], eax ; ret
     # TODO: may have to swap pop and num depending on what order of arguments are
 # assumes edx is head, eax is value and will store what is in head
 def read_head(self):
     # move at address of edx into eax
-    return "0x0006a227"
+    return "0x0006a227" # mov eax, dword ptr [edx] ; ret
+
 def move_head_left(self):
     # no decrement for edx
     # may have to add FFFF thing to decrement
@@ -30,7 +31,7 @@ def move_head_left(self):
     tempOutput += "0x0007bc64" # 0x0007bc64 : dec eax
     tempOutput += "0x00121c7d" # 0x00121c7d : mov edx, eax ; mov eax, edx ; ret
 def move_head_right(self):
-    return "0x0002d654"
+    return "0x0002d654" # : inc edx ; ret
 def increment_reg(self, reg):
     if(reg == "eax"):
         return "0x000270ea"
@@ -78,10 +79,19 @@ def zero_out_reg(self, reg):
         tempOutput += "0x0006ecc0" # xor esi, esi
         return tempOutput
     if(reg == "ecx")
+        tempOutput = ""
         # 0x00116fc3 : xor ecx, ecx ; mov eax, ecx ; pop ebx ; pop esi ; ret
         tempOutput += self.push_register("esi")
         tempOutput += self.push_register("ebx")
         tempOutput += "0x00116fc3" # xor ecx, ecx
+        return tempOutput
+    if(reg == "ebx")
+        tempOutput = ""
+        # 0x000808c2 : xor ebx, ebx ; mov eax, ebx ; pop ebx ; pop esi ; pop edi ; ret
+        tempOutput += self.push_register("edi")
+        tempOutput += self.push_register("esi")
+        tempOutput += self.push_register("ebx") # trash eax
+        tempOutput += "0x000808c2" # xor ecx, ecx
         return tempOutput
     # for other registers, no xor command
     # TODO: figure out way to zero out others
@@ -142,6 +152,11 @@ def swap_two_regs(self, reg1, reg2):
 def set_esp(self, reg):
 # TODO: remove quotes above
 # def write_ecx_to_mem(mem_loc):
+def move_state_to_ch(self):
+    # NOTE: ASSUMES STATE IS ON STACK
+    output = self.pop_register("eax")
+    output += "0x0006ea87"  # or ch, al ; ret
+    return output
 def add_eax_to_edx(self):
     # 0x00121c91 : add edx, eax ; pop ebx ; pop esi ; mov eax, edx ; ret
     tempOutput = self.push_register("esi")
@@ -188,32 +203,55 @@ def jump(self):
 def helper(self, helperOutput, filename):
     # zero out ecx
     # run for loop
-    scan = open(filename, (r))
-    helperOutput += self.zero_out_reg("ecx") # no zero out for ecx ATM
+    # read tape into eax
+    # move it into ecx (cl)
+    # zero out ecx
+    # push state
+    # pop into eax
+    # or ch, al
     helperOutput += self.read_head() # will store in eax
+    scan = open(filename, (r))
+
+    # NOTE: THIS SECTION IS MOVING AL TO CL
+    # xchg eax, ebp
+    helperOutput += "0x0002d455" # xchg eax, ebp ; ret
+    # zero out ecx and ebx; NOTE: BOTH WILL TRASH EAX
+    helperOutput += zero_out_reg("ecx")
+    helperOutput += zero_out_reg("ebx")
+    # restore eax using xchg
+    helperOutput += "0x0002d455" # xchg eax, ebp ; ret
+    # push eax, pop ecx
+    helperOutput += push_register("eax")
+    helperOutput += pop_register("ecx")
+
     for i in range(0, 100):
+        # increment higher 8 bits
         for i in range(0, 255):
+            # increment lower 8 bits
+
             # push tape value onto stack, push reg value onto stack, see if equal
             # use compare, if NE, JUMP
             # write to mem_location
             # compare EAX to every input symbol
             # need another register to hold state
 
-            # 0x00115ff6 : cmp ecx, eax ; sbb eax, eax ; pop ebx ; pop esi ; ret
-            helperOutput += push_register("esi")
-            helperOutput += "0x0012e414" # push random instead of pushing ebx; push 0x1185f89
-            helperOutput += "0x00115ff6" # cmp ecx, eax
-            helperOutput += self.read_head() # put head value at edx back into eax
             # read from the text file and write three bytes to memory
                 # output state, symbol, and direction
             helperOutput += self.jump()
+            # restore registers: esi to edx, edi to eax
+            helperOutput += "0x00020a3d" # xchg eax, edi ; ret
+            helperOutput += push_register("esi")
+            helperOutput += pop_register("edx")
             output = scan.readline()
-            outputArr = output.split("")
+            outputArr = output.split(" ")
             helperOutput += self.write_head(outputArr[3])
             # check for state?
-
-            helperOutput += self.pop_register("ebp")
+            # set the new 
             helperOutput += outputArr[2]
+            helperOutput += self.move_state_to_ch()
+            # don't need eax anymore at this point
+            # check if state is accept or reject
+            # if neither, call helper method again
             if(outputArr[4] == 'R'):
                 helperOutput += self.move_head_right()
             else:
@@ -230,10 +268,12 @@ def helper(self, helperOutput, filename):
                 exit(0) # put lib c instruction to exit
             # if reject, exit with 1
             # if accept, exit with 0
-            # if neither, set output state (modify register esi - contains state)
+            # if neither, set output state (modify register ebp - contains state)
                 # move head in right direction based on output byte
                 # start for loop again, zero out ecx
             # increment ecx
+            helperOutput += increment_reg("ebx")
+            # restore eax and ecx with their proper values
             # repeat whole loop
 def main(filename):
     # NOTE: will probably have to increment by 2 or 3 instead of 1 for mem location
@@ -246,7 +286,6 @@ def main(filename):
     # set register back to 0 once you exit inner loop
     output = ""
     output += self.move_head_into_edx()
-    output += self.read_head() # will store in eax
     output += self.zero_out_reg("ecx") # no zero out for ecx ATM
     print(self.helper(output, filename))
 
