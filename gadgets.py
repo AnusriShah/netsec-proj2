@@ -13,6 +13,7 @@ def initialize_head_state(self):
     tempOutput += "0x0001a4cc" # pop ebp
     return tempOutput
 # head is edx, eax is the value, moving eax into edx
+#change
 def write_head(self, num):
     tempOutput += num
     tempOutput += self.pop_register("eax")
