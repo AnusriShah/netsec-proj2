@@ -13,8 +13,11 @@ def initialize_head_state(self):
     tempOutput += "0x0001a4cc" # pop ebp
     return tempOutput
 # head is edx, eax is the value, moving eax into edx
-def write_head(self):
-    return '0x0007672a'
+def write_head(self, num):
+    tempOutput += self.pop_register("eax")
+    tempOutput = num
+    tempOutput += "0x0007672a" # mov dword ptr [edx], eax ; ret
+    # TODO: may have to swap pop and num depending on what order of arguments are
 # assumes edx is head, eax is value and will store what is in head
 def read_head(self):
     # move at address of edx into eax
@@ -182,9 +185,10 @@ def jump(self):
     output += self.pop_register("esp")
     # push esp, popinto reg2, add eax to reg2
     # ret
-def helper(self, helperOutput):
+def helper(self, helperOutput, filename):
     # zero out ecx
     # run for loop
+    scan = open(filename, (r))
     helperOutput += self.zero_out_reg("ecx") # no zero out for ecx ATM
     helperOutput += self.read_head() # will store in eax
     for i in range(0, 100):
@@ -200,7 +204,20 @@ def helper(self, helperOutput):
             helperOutput += "0x0012e414" # push random instead of pushing ebx; push 0x1185f89
             helperOutput += "0x00115ff6" # cmp ecx, eax
             helperOutput += self.read_head() # put head value at edx back into eax
+            # read from the text file and write three bytes to memory
+                # output state, symbol, and direction
             helperOutput += self.jump()
+            output = scan.readline()
+            outputArr = output.split("")
+            helperOutput += self.write_head(outputArr[3])
+            # check for state?
+
+            helperOutput += self.pop_register("ebp")
+            helperOutput += outputArr[2]
+            if(outputArr[4] == 'R'):
+                helperOutput += self.move_head_right()
+            else:
+                helperOutput += self.move_head_left()
             # JUMP: JNE, push output byte (state, symbol, direction)
             # check the output byte - see if state is accept or reject
             # parse output byte
@@ -218,7 +235,7 @@ def helper(self, helperOutput):
                 # start for loop again, zero out ecx
             # increment ecx
             # repeat whole loop
-def main():
+def main(filename):
     # NOTE: will probably have to increment by 2 or 3 instead of 1 for mem location
         # bc we also have to include compare/jump instructions
         # compare sets the flag, JNE checks the flag
@@ -231,7 +248,7 @@ def main():
     output += self.move_head_into_edx()
     output += self.read_head() # will store in eax
     output += self.zero_out_reg("ecx") # no zero out for ecx ATM
-    print(self.helper(output))
+    print(self.helper(output, filename))
 
 
 
