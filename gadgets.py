@@ -7,17 +7,14 @@ class ROP:
         # initialize head
         tempOutput = "0x0008ae23" # push ecx
         tempOutput += "0x0002effc" # pop edx
-        # initialize state
-        # register that stores the state - using ebp 
-        tempOutput += "0x0002ff9f" # zero out eax
-        tempOutput += "0x0002e745" # push eax
-        tempOutput += "0x0001a4cc" # pop ebp
         return tempOutput
     # head is edx, eax is the value, moving eax into edx
     def write_head(self, num):
-        tempOutput += num
+        #TODO:*********unsure if this is allowed**********
+        tempOutput = num
         tempOutput += self.pop_register("eax")
         tempOutput += "0x0007672a" # mov dword ptr [edx], eax ; ret
+        return tempOutput
         # TODO: may have to swap pop and num depending on what order of arguments are
     # assumes edx is head, eax is value and will store what is in head
     def read_head(self):
@@ -27,17 +24,24 @@ class ROP:
         # no decrement for edx
         # may have to add FFFF thing to decrement
         # move edx into eax, decrement eax, move it back
-        tempOutput = "0x00088f34" # 0x00088f34 : mov eax, edx
-        tempOutput += "0x0007bc64" # 0x0007bc64 : dec eax
+        tempOutput = "0x00088f34" # 0x00088f34 : mov eax, edx; ret
+        tempOutput += "0x0007bc64" # 0x0007bc64 : dec eax; ret
         tempOutput += "0x00121c7d" # 0x00121c7d : mov edx, eax ; mov eax, edx ; ret
+        return tempOutput
     def move_head_right(self):
-        return "0x0002d654" # : inc edx ; ret
+        #NOTE: ADDED NOPS TO BALANCE W/ MOVE_HEAD_LEFT BUT COULD BE VERY WRONG
+        tempOutput = "0x0002d654" # : inc edx ; ret
+        tempOutput += "0x0001a8bf" #nops
+        tempOutput += "0x0001a8bf"
+        tempOutput += "0x0001a8bf"
+        tempOutput += "0x0001a8bf"
+        return tempOutput
     def increment_reg(self, reg):
         if(reg == "eax"):
             return "0x000270ea"
         if(reg == "ebp"):
             return "0x00035832"
-        if(reg == "ecx"):
+        if (reg == "ebx"):
             return "0x0002d216"
         if(reg == "edx"):
             return "0x0002d654"
@@ -79,6 +83,7 @@ class ROP:
             tempOutput += "0x0006ecc0" # xor esi, esi
             return tempOutput
         if(reg == "ecx"):
+            #trashes eax
             tempOutput = ""
             # 0x00116fc3 : xor ecx, ecx ; mov eax, ecx ; pop ebx ; pop esi ; ret
             tempOutput += self.push_register("esi")
@@ -114,6 +119,9 @@ class ROP:
     def push_register(self, reg):
         if(reg == "eax"):
             return "0x0002e745"
+        if (reg == "ecx"):
+            #0x0008ae23 : push ecx ; add al, 0x5b ; ret // TRASHES EAX
+            return "0x0008ae23"
         if(reg == "edi"):
             return "0x000e5705"
         if(reg == "edx"):
@@ -143,6 +151,7 @@ class ROP:
             #push eax, 0x000fdcf0 : pop ecx ; pop eax ; ret
             tempOutput = self.push_register("eax")
             tempOutput += "0x000fdcf0"
+            return tempOutput
     def and_eax_register(self, reg):
         if(reg == "ecx"):
             return "0x0002d87e"
@@ -153,7 +162,6 @@ class ROP:
         return ""
     def move_state_to_ch(self):
         # NOTE: ASSUMES STATE IS ON STACK
-        output += self.zero_out_reg("eax")
         output = self.pop_register("eax")
         output += "0x0006ea87"  # or ch, al ; ret
         return output
@@ -164,11 +172,15 @@ class ROP:
         tempOutput += "0x00121c91" # add edx, eax
         return tempOutput
     def jump(self):
+        #print("in jump")
         # mov eax into temp register (edi)
         output = ""
         output += self.push_register("eax")
         output += self.pop_register("edi")
-        # sub eax, ecx
+        # sub eax, ebx
+        #0x000994ba : sub eax, ebx ; pop ebx ; pop esi ; ret
+        output += self.push_register("esi")
+        output += self.push_register("ebx")
         output += "0x00150e98"
         # neg eax
         output += "0x000654b0"
@@ -185,7 +197,9 @@ class ROP:
         output += self.push_register("edx")
         output += self.pop_register("esi") # esi has edx value, aka head; edi has eax AKA symbol
         #TODO: PUT ESP_DELTA INTO EDX
-        # go thru and count how many instr. we have
+        # esp_delta = 74 -> change this
+        output += "0x4a"        #TODO:********unsure if this is allowed*************
+        output += self.pop_register("edx")
         # and eax, esp_delta
         output += self.and_eax_register("edx") # and eax, edx (esp_delta)
         output += self.increment_reg("ebx")
@@ -200,21 +214,12 @@ class ROP:
         output += self.add_eax_to_edx()
         output += self.push_register("edx")
         output += self.pop_register("esp")
-        # push esp, popinto reg2, add eax to reg2
-        # ret
-    def helper(self, helperOutput, filename):
-        # zero out ecx
-        # run for loop
-        # read tape into eax
-        # move it into ecx (cl)
-        # zero out ecx
-        # push state
-        # pop into eax
-        # or ch, al
+        return output
+        
+    def helper(self, helperOutput, scan, length):
+        #print("in helper")
         helperOutput += self.read_head() # will store in eax 
         #NOTE: this only works if read_head() only overwrites the lower 8 bits of eax - think we need to fix this!!!!!
-        scan = open(filename, 'r')
-
         # NOTE: THIS SECTION IS zeroing out ebx & moving input symbol to AL
         # xchg eax, ebp
         helperOutput += "0x0002d455" # xchg eax, ebp ; ret
@@ -225,42 +230,46 @@ class ROP:
         #eax now has input symbol again
 
         #TODO: change code to compare eax (state/symbol) & ebx (counter)
-        for i in range(0, 100):
-            # increment higher 8 bits
-            for i in range(0, 255):
-                helperOutput += self.jump()
-                # restore registers: esi to edx, edi to eax
-                helperOutput += "0x00020a3d" # xchg eax, edi ; ret
-                helperOutput += self.push_register("esi")
-                helperOutput += self.pop_register("edx")
-                output = scan.readline()
-                outputArr = output.split(" ")
-                helperOutput += self.write_head(outputArr[3])
-                # check for accept/reject state. else, call helper again
-                if (outputArr[2] == 'r'):
-                    #exit(1)
-                    return helperOutput
-                
-                elif (outputArr[2] == 'a'):
-                    #exit(0)
-                    return helperOutput
+        for i in range(0, length):
+            helperOutput += self.jump()
+            # restore registers: esi to edx, edi to eax
+            helperOutput += "0x00020a3d" # xchg eax, edi ; ret
+            helperOutput += self.push_register("esi")
+            helperOutput += self.pop_register("edx")
+            output = scan.readline()
+            #print(output)
+            outputArr = output.split(" ")
+            helperOutput += self.write_head(outputArr[3])
+            # check for accept/reject state. else, call helper again
+            #print(outputArr[2])
+            if (outputArr[2] == 'r'):
+                #print("reject")
+                helperOutput += "exit(1)"
+                #return helperOutput
+            
+            elif (outputArr[2] == 'a'):
+                #print("accept")
+                helperOutput += "exit(0)"
+                #return helperOutput
+            else:
+                helperOutput += self.zero_out_reg("ecx")
+                #TODO: ***********unsure if this is allowed*************
+                helperOutput += outputArr[2]
+                helperOutput += self.move_state_to_ch()
+                #at this point, the new state is in ecx, move to eax, al is 0
+                helperOutput += self.push_register("ecx")
+                helperOutput += self.pop_register("eax")
+                #check direction
+                if(outputArr[4] == 'R'):
+                    helperOutput += self.move_head_right()
                 else:
-                    #0x0002664e : xchg eax, ecx ; and al, 0x5b ; ret 
-                    helperOutput += "0x0002664e"
-                    helperOutput += outputArr[2]
-                    helperOutput += self.move_state_to_ch()
-                    #at this point, the new state & old symbol are in ecx -> need to move to eax
-                    helperOutput += self.push_register("ecx")
-                    helperOutput += self.pop_register("eax")
-                    #check direction
-                    if(outputArr[4] == 'R'):
-                        helperOutput += self.move_head_right()
-                    else:
-                        helperOutput += self.move_head_left()
-                    helperOutput = self.helper(helperOutput, filename)
+                    helperOutput += self.move_head_left()
+                #helperOutput = self.helper(helperOutput, scan, length)
+                #return self.helper(helperOutput, scan, length)
+        return helperOutput
 
     def main(self, filename):
-        print("hello")
+        #print("hello")
         # NOTE: will probably have to increment by 2 or 3 instead of 1 for mem location
             # bc we also have to include compare/jump instructions
             # compare sets the flag, JNE checks the flag
@@ -273,7 +282,12 @@ class ROP:
         output += self.initialize_head_state()
         output += self.zero_out_reg("eax")
         output += self.zero_out_reg("ecx") # no zero out for ecx ATM
-        print(self.helper(output, filename))
+        input_ = open(filename, 'r')
+        inputLines = input_.readlines()
+        length = len(inputLines)
+        input_.close()
+        scan = open(filename, 'r')
+        print(self.helper(output, scan, length))
 a = ROP()
 a.main("testing.txt")
 
