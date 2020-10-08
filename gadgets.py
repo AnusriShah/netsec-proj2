@@ -11,16 +11,16 @@ class ROP:
         tempOutput += 0x0002effc.to_bytes(4, byteorder='little') # pop edx
         tempOutput += 0x0008ae23.to_bytes(4, byteorder='little') # push ecx -> NEED TO FIX THIS
         return tempOutput
-
-    # head is edx, eax is the value, moving eax into edx
+    
     def write_head(self, num):
+        # head is edx, eax is the value, moving eax into edx
         tempOutput += self.pop_register("eax")
         tempOutput += num
         tempOutput += 0x0007672a.to_bytes(4, byteorder='little') # mov dword ptr [edx], eax ; ret
         return tempOutput
-
-    # assumes edx is head, eax is value and will store what is in head
+    
     def read_head(self):
+        # assumes edx is head, eax is value and will store what is in head
         # move at address of edx into eax
         return 0x0006a227.to_bytes(4, byteorder='little') # mov eax, dword ptr [edx] ; ret
 
@@ -69,7 +69,6 @@ class ROP:
             return 0x0005118a.to_bytes(4, byteorder='little')
         if(reg == "esp"):
             return 0x000ea6c7.to_bytes(4, byteorder='little')      
-
     
     def eax_minus_ecx(self):
         # EAX = EAX - ECX
@@ -267,7 +266,7 @@ class ROP:
                 #helperOutput = self.helper(helperOutput, scan, length)
                 #return self.helper(helperOutput, scan, length)
         return helperOutput
-        
+
     def main(self, filename):
         #COUNTER: ECX
         output = self.initialize_head_state()
