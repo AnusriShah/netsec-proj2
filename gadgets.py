@@ -486,7 +486,7 @@ class ROP:
         #sys.stdout.buffer.write((0x0002ff9f + 0xb7dec000).to_bytes(4, byteorder='little'))
         #print("LENGTH: ",len(self.arr))
 a = ROP(0)
-a.main("testing.txt")
+a.main(sys.argv[1])
 
 
             
