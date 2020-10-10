@@ -472,6 +472,7 @@ class ROP:
 
     def main(self, filename):
         #COUNTER: ECX
+        #need a change
         self.initialize_head_state()
         self.zero_out_reg("eax")
         input_ = open(filename, 'r')
