@@ -229,7 +229,7 @@ class ROP:
         self.helper(scan, length)
         sys.stdout.buffer.write(self.arr)
 a = ROP()
-a.main(sys.argv[1])
+a.main("testing.txt")
 
 
             
